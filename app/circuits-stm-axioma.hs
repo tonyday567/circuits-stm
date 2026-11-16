@@ -8,7 +8,7 @@ module Main (main) where
 
 import Circuit.Axioma.Test (check)
 import Circuit.Category (K (..), runK)
-import Circuit.Machine (Poles (..), polesK)
+import Circuit.Machine (Poles (..), pipe, polesK)
 import Circuit.STM
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, cancel, poll, waitSTM)
@@ -18,11 +18,16 @@ import Control.Monad (unless)
 import Data.Functor (($>))
 import Data.Maybe (isNothing)
 import System.Exit (exitFailure)
+import System.Timeout (timeout)
 import Prelude hiding (read)
 
 -- | Delay used to decide that an operation has blocked.
 patience :: Int
 patience = 50000
+
+-- | Generous delay for a pipelined read, which waits on a pump thread.
+patienceIO :: Int
+patienceIO = 1000000
 
 -- | Write end of an STM pair.
 writeEnd :: Poles () (K STM) a a -> a -> STM ()
@@ -152,10 +157,36 @@ haltTopic =
           unit == ()
     ]
 
+-- | A two-read consumer: it needs both tokens before it can answer.
+pairSumEnds :: TQueue Int -> Poles () (K IO) Int Int
+pairSumEnds q =
+  polesK (atomically . writeTQueue q) (atomically $ (+) <$> readTQueue q <*> readTQueue q)
+
 pipeTopic :: IO [Bool]
 pipeTopic =
   sequence
     [ do
+        -- The degeneracy that earns the queue: 'pipe' composes through the
+        -- unit carrier, so the intermediate wire is read once and a consumer
+        -- that needs two tokens never completes.
+        e1 <- openLinearChannel :: IO (Poles () (K IO) Int Int)
+        q <- newTQueueIO
+        let composed = pipe e1 (pairSumEnds q)
+        writeEndIO composed 1
+        writeEndIO composed 2
+        serial <- timeout patienceIO (readEndIO composed)
+        check "pipe over allocated ends serialises the intermediate read" $
+          isNothing serial,
+      do
+        e1 <- openLinearChannel :: IO (Poles () (K IO) Int Int)
+        (pipeline, shutdown) <- pipeEnds e1 (pure . pairSumEnds)
+        writeEndIO pipeline 1
+        writeEndIO pipeline 2
+        total <- timeout patienceIO (readEndIO pipeline)
+        shutdown
+        check "pipeEnds pumps both tokens, so the two-read consumer answers 3" $
+          total == Just 3,
+      do
         left <- openLinearChannel :: IO (Poles () (K IO) Int Int)
         (composite, shutdown) <-
           pipeEnds left $ \q ->
