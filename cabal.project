@@ -1,0 +1,5 @@
+packages:
+  ./
+  ../circuits
+
+write-ghc-environment-files: always

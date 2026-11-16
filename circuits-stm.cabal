@@ -1,0 +1,58 @@
+cabal-version: 3.0
+name: circuits-stm
+version: 0.1.0.0
+license: BSD-3-Clause
+license-file: LICENSE
+copyright: Tony Day (c) 2026
+category: control
+author: Tony Day
+maintainer: tonyday567@gmail.com
+synopsis: Effectful Poles over STM queues
+description:
+  Generic effectful Ends: a queue strategy, the Poles pair it opens, and the
+  honest sequential composition of two allocated ends.  Everything here is
+  polymorphic in the token type and knows nothing about posts, agents or
+  delivery policy.
+
+build-type: Simple
+tested-with:
+  ghc ==9.10.1
+  ghc ==9.12.2
+  ghc ==9.14.1
+
+common ghc-options-stanza
+  ghc-options:
+    -Wall
+    -Wno-unused-imports
+    -Wcompat
+    -Widentities
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wpartial-fields
+    -Wredundant-constraints
+
+library
+  import: ghc-options-stanza
+  default-language: GHC2024
+  hs-source-dirs: src
+  exposed-modules:
+    Circuit.STM
+
+  build-depends:
+    async >=2.2 && <2.3,
+    base >=4.20 && <5,
+    circuits >=0.3 && <0.4,
+    stm >=2.5 && <2.6,
+
+executable circuits-stm-axioma
+  import: ghc-options-stanza
+  ghc-options: -threaded -rtsopts
+  default-language: GHC2024
+  main-is: circuits-stm-axioma.hs
+  hs-source-dirs: app
+  build-depends:
+    base >=4.20 && <5,
+    async >=2.2 && <2.3,
+    circuits >=0.3 && <0.4,
+    circuits-stm,
+    stm >=2.5 && <2.6,
