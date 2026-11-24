@@ -8,7 +8,7 @@ module Main (main) where
 
 import Circuit.Axioma.Test (check)
 import Circuit.Category (K (..), runK)
-import Circuit.Machine (Poles (..), pipe, polesK)
+import Circuit.Body (Poles (..), pipe, polesK)
 import Circuit.STM
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, cancel, poll, waitSTM)
